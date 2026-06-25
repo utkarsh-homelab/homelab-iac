@@ -13,6 +13,7 @@ cp terraform.tfvars.example terraform.tfvars   # fill in your values
 terraform init && terraform apply               # creates VMs, prints MACs
 
 # 2. Reserve IPs on your router using the MAC addresses from step 1
+#    and Update the IPs for hosts in Ansible Inventory
 
 # 4. Bootstrap the cluster
 cd ../ansible
