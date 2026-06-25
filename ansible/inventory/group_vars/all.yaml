@@ -1,0 +1,19 @@
+---
+# ──────────────────────────────────────────────
+# Global variables for the Kubernetes cluster
+# ──────────────────────────────────────────────
+
+# Kubernetes version (affects apt repo and package versions)
+kubernetes_version: "1.36"
+kubernetes_package_version: "1.36.2-2.1"
+
+# Pod network CIDR for the cluster
+pod_network_cidr: "10.244.0.0/16"
+
+# CNI plugin — options: "flannel", "cilium"
+# To switch, change this value and ensure the corresponding
+# task file exists in roles/cni/tasks/
+cni_plugin: "flannel"
+
+# Show Kubeconfig after cluster creation so you can Svae it to your local system.
+show_kubeconfig_at_end: true

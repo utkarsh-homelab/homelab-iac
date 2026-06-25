@@ -1,0 +1,36 @@
+---
+# ── Disable swap ──────────────────────────────────────────
+- name: Disable swap immediately
+  command: swapoff -a
+  changed_when: false
+
+- name: Remove swap from fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)'
+    replace: '# \1'
+
+# ── Kernel modules ────────────────────────────────────────
+- name: Load br_netfilter module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Persist br_netfilter module
+  copy:
+    content: "br_netfilter\n"
+    dest: /etc/modules-load.d/k8s.conf
+    mode: '0644'
+
+# ── Sysctl ────────────────────────────────────────────────
+- name: Apply required sysctl settings
+  sysctl:
+    name: "{{ item }}"
+    value: '1'
+    sysctl_set: true
+    sysctl_file: /etc/sysctl.d/k8s.conf
+    reload: true
+  loop:
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.ipv4.ip_forward

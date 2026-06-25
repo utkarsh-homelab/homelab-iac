@@ -1,0 +1,25 @@
+---
+# ────────────────────────────────────────────────────────────
+# Ansible inventory for Kubernetes cluster
+#
+# 1. Replace the IPs below with the actual IPs from your
+#    DHCP reservation.
+# 2. Add more hosts under control_plane or workers as needed.
+# ────────────────────────────────────────────────────────────
+all:
+  children:
+    control_plane:
+      hosts:
+        k8s-master-1:
+          ansible_host: 192.168.0.170
+        # k8s-master-2:
+        #   ansible_host: 192.168.0.180
+    workers:
+      hosts:
+        k8s-worker-1:
+          ansible_host: 192.168.0.171
+        # k8s-worker-2:
+        #   ansible_host: 192.168.0.181
+  vars:
+    ansible_user: ubuntu
+    ansible_become: true

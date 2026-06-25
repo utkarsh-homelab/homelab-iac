@@ -1,0 +1,4 @@
+---
+- include_tasks: kernel.yaml
+- include_tasks: containerd.yaml
+

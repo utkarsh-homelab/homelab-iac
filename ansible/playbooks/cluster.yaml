@@ -1,0 +1,129 @@
+---
+# ───────────────────────────────────────────────────────────
+# cluster.yaml — Full Kubernetes cluster bootstrap
+#
+# Usage:
+#   ansible-playbook playbooks/cluster.yaml
+#
+# Tags:
+#   common     — containerd, kernel modules, sysctl, swap
+#   kubeadm    — install kubelet/kubeadm/kubectl + init + join
+#   cni        — deploy overlay network (flannel/cilium)
+#   control    — run only control-plane steps
+#   workers    — run only worker-node steps
+# ───────────────────────────────────────────────────────────
+
+- name: "Phase 1 — Common setup (all nodes)"
+  hosts: all
+  become: true
+  tags: [common]
+  roles:
+    - common
+
+- name: "Phase 2 — Install Kubernetes components (all nodes)"
+  hosts: all
+  become: true
+  tags: [kubeadm]
+  roles:
+    - kubeadm
+
+- name: "Phase 3 — Bootstrap control-plane"
+  hosts: control_plane
+  become: true
+  tags: [kubeadm, control]
+  tasks:
+    - name: Initialize Kubernetes cluster
+      shell: |
+        kubeadm init \
+          --control-plane-endpoint={{ ansible_host }} \
+          --node-name={{ inventory_hostname }} \
+          --pod-network-cidr={{ pod_network_cidr }}
+      args:
+        creates: /etc/kubernetes/admin.conf
+      register: kubeadm_init
+
+    - name: Set up kubeconfig for ubuntu user
+      block:
+        - name: Create .kube directory
+          file:
+            path: /home/ubuntu/.kube
+            state: directory
+            owner: ubuntu
+            group: ubuntu
+            mode: '0755'
+
+        - name: Copy admin.conf
+          copy:
+            src: /etc/kubernetes/admin.conf
+            dest: /home/ubuntu/.kube/config
+            owner: ubuntu
+            group: ubuntu
+            mode: '0600'
+            remote_src: true
+
+    - name: Generate cluster join command
+      shell: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: Set fact with join command
+      set_fact:
+        kubeadm_join_command: "{{ join_command_raw.stdout }}"
+
+    - name: Install CNI plugin
+      include_role:
+        name: cni
+      tags: [cni]
+
+- name: "Phase 4 — Join worker nodes"
+  hosts: workers
+  become: true
+  tags: [kubeadm, workers]
+  tasks:
+    - name: Join worker to cluster
+      shell: "{{ hostvars[groups['control_plane'][0]]['kubeadm_join_command'] }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+      register: join_result
+
+    - name: Wait for node to appear
+      when: join_result.changed
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      shell: |
+        kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=120s
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      changed_when: false
+      ignore_errors: true
+
+    - name: Label worker node
+      when: join_result is succeeded
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      ansible.builtin.shell: |
+        kubectl label node {{ inventory_hostname }} node-role.kubernetes.io/worker= --overwrite
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      changed_when: false
+
+- name: "Phase 5 — Optionally show kubeconfig"
+  hosts: control_plane
+  become: false
+  tags: [kubeconfig]
+  tasks:
+    - name: Read admin kubeconfig from control-plane
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/admin.conf
+      register: admin_kubeconfig_raw
+      run_once: true
+      become: true
+      when: show_kubeconfig_at_end | bool
+
+    - name: Print kubeconfig
+      ansible.builtin.shell: cat /etc/kubernetes/admin.conf
+      register: kubeconfig_out
+      changed_when: false
+      when: show_kubeconfig_at_end | bool
+
+    - name: Raw kubeconfig
+      ansible.builtin.debug:
+        msg: "{{ kubeconfig_out.stdout }}"
+      when: show_kubeconfig_at_end | bool

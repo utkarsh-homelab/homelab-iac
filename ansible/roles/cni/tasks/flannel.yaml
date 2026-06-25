@@ -1,0 +1,16 @@
+---
+- name: Deploy Flannel overlay network
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+  register: flannel_result
+  changed_when: "'created' in flannel_result.stdout"
+
+- name: Wait for Flannel daemonset to roll out
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl wait --for=condition=ready pod -n kube-flannel -l app=flannel --timeout=180s 2>/dev/null || true
+  changed_when: false
+  ignore_errors: true

@@ -1,0 +1,21 @@
+---
+- name: Download Cilium CLI
+  get_url:
+    url: https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz
+    dest: /tmp/cilium.tar.gz
+    timeout: 60
+
+- name: Extract Cilium CLI
+  unarchive:
+    src: /tmp/cilium.tar.gz
+    dest: /usr/local/bin/
+    remote_src: true
+    mode: '0755'
+
+- name: Install Cilium
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    cilium install --wait
+  register: cilium_install
+  changed_when: "'successfully' in cilium_install.stdout"
