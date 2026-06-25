@@ -1,0 +1,11 @@
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/secrets.auto.tfvars
+
+# OS
+.DS_Store
+*.swp
+*.swo

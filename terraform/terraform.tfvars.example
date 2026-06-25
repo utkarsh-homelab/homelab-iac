@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────
+# homelab-iac — Terraform non-secret variables
+#
+# SECRETS go in secrets.auto.tfvars (gitignored).
+# See secrets.auto.tfvars.example for the required vars.
+# ──────────────────────────────────────────────
+
+proxmox_endpoint = "https://192.168.0.100:8006/"
+proxmox_insecure = true
+
+template_id = 9000
+bridge      = "vmbr0"
+storage     = "local-lvm"
+
+vms = {
+  k8s-master-1 = {
+    target_node = "pve1"
+    vm_id       = 170
+    name        = "k8s-master-1"
+    cores       = 2
+    memory      = 4096
+    disk_size   = 50
+  },
+  k8s-worker-1 = {
+    target_node = "pve1"
+    vm_id       = 171
+    name        = "k8s-worker-1"
+    cores       = 2
+    memory      = 4096
+    disk_size   = 50
+  }
+}
