@@ -76,3 +76,5 @@ homelab-iac/
 See the guides noted below for detailed setup instructions.
 
 - [Terraform Guide](https://github.com/utkarsh-homelab/homelab-docs/blob/main/guides/guide-02_02-automating-k8s-vm-creation-terraform.md) 
+
+- [Ansible Guide](https://github.com/utkarsh-homelab/homelab-docs/blob/main/guides/guide-02_03-automating-k8s-cluster-setup-ansible.md)
