@@ -23,3 +23,10 @@ all:
   vars:
     ansible_user: ubuntu
     ansible_become: true
+
+ungrouped:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_become: false
+      ansible_python_interpreter: /usr/bin/python3

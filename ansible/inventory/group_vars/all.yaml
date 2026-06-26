@@ -17,3 +17,20 @@ cni_plugin: "flannel"
 
 # Show Kubeconfig after cluster creation so you can Svae it to your local system.
 show_kubeconfig_at_end: true
+
+# ArgoCD Helm chart configuration
+argocd_helm_repo:      "https://argoproj.github.io/argo-helm"
+argocd_helm_chart:     "argo/argo-cd"
+argocd_helm_version:   "9.7.0"
+
+# ArgoCD application version - used in CRD URLs
+argocd_version: "v3.4.4"
+
+# ArgoCD external URL - used in helm --set and ingress config
+argocd_url: "https://argocd.uttutu.xyz"
+
+# homelab-gitops repo URL for the root App of Apps
+argocd_gitops_repo: "https://github.com/utkarsh-homelab/homelab-gitops"
+
+# ArgoCD Helm values — pulled from the homelab-infra-charts repo at runtime
+argocd_values_url: "https://raw.githubusercontent.com/utkarsh-homelab/homelab-infra-charts/main/charts/argocd/values/prod.yaml"

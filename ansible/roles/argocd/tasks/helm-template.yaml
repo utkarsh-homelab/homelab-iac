@@ -1,0 +1,36 @@
+---
+# ── Generate ArgoCD bootstrap manifests with Helm ──
+# Requires helm binary on the Ansible control node.
+#
+# CRDs are skipped here (--skip-crds) to avoid the 256KB
+# annotation limit on the ApplicationSets CRD. They are
+# installed separately from upstream URLs in main.yaml.
+
+- name: Download ArgoCD values from homelab-infra-charts
+  local_action: get_url url="{{ argocd_values_url }}" dest=/tmp/argocd-values.yaml timeout=30
+  register: values_download
+  run_once: true
+  become: false
+
+- name: Add ArgoCD Helm repository
+  local_action: shell helm repo add argo {{ argocd_helm_repo }} 2>/dev/null || true
+  changed_when: false
+  run_once: true
+  become: false
+
+- name: Update Helm repositories
+  local_action: shell helm repo update 2>/dev/null || true
+  changed_when: false
+  run_once: true
+  become: false
+
+- name: Template and write ArgoCD manifests
+  local_action: shell helm template argocd {{ argocd_helm_chart }} --version {{ argocd_helm_version }} --namespace argocd --create-namespace --skip-crds --values /tmp/argocd-values.yaml --set argo-cd.configs.cm.url={{ argocd_url }} > {{ role_path }}/files/argocd-install.yaml
+  register: helm_template_result
+  run_once: true
+  become: false
+
+- name: Show result
+  debug:
+    msg: "Generated {{ role_path }}/files/argocd-install.yaml"
+  when: helm_template_result.changed

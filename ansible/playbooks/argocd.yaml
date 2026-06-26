@@ -1,0 +1,30 @@
+---
+# ───────────────────────────────────────────────────────────
+# argocd.yaml - Bootstrap ArgoCD on the cluster
+#
+# Prerequisites:
+#   - Cluster is running and healthy (run cluster.yaml first)
+#   - kubectl is configured on the control-plane node
+#   - All nodes show "Ready" status
+#
+# Usage:
+#   ansible-playbook playbooks/argocd.yaml
+#
+# To include the root App of Apps from the homelab-gitops repo:
+#   ansible-playbook playbooks/argocd.yaml --tags root-app
+#
+# To regenerate vendored manifests with Helm:
+#   ansible-playbook playbooks/argocd.yaml --tags regenerate
+#
+# Tags:
+#   crd        - Install ArgoCD CRDs only
+#   argocd     - Full bootstrap (CRDs + manifests + wait)
+#   root-app   - Apply root App of Apps (requires homelab-gitops repo)
+#   regenerate - Regenerate vendored argocd-install.yaml with helm
+# ───────────────────────────────────────────────────────────
+
+- name: Bootstrap ArgoCD on control-plane
+  hosts: control_plane
+  become: true
+  roles:
+    - role: argocd

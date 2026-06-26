@@ -1,0 +1,137 @@
+---
+# ──────────────────────────────────────────────
+# Bootstrap ArgoCD on the cluster
+#
+# Flow:
+#   1. Install ArgoCD CRDs from upstream URLs
+#      (separate from Helm to avoid 256KB annotation limit)
+#   2. Generate bootstrap manifests via Helm template (if no vendored file)
+#   3. Copy manifests to the node
+#   4. Create argocd namespace
+#   5. Apply manifests with --server-side (avoids annotation limit)
+#   6. Wait for ArgoCD server to be ready
+#   7. Print initial admin password
+#
+# Optional (tag: root-app):
+#   8. Apply root App of Apps from homelab-gitops repo
+# ──────────────────────────────────────────────
+
+# ── Step 1: Install CRDs ─────────────────────────────
+- name: Install Application CRD
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/crds/application-crd.yaml
+  register: app_crd
+  changed_when: "'configured' in app_crd.stdout or 'created' in app_crd.stdout"
+  tags: [crd, root-app]
+
+- name: Install ApplicationSet CRD
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  # Use create (not apply) — the CRD manifest exceeds 256KB
+  # annotation limit that kubectl apply enforces
+  shell: |
+    kubectl create -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/crds/applicationset-crd.yaml 2>/dev/null || true
+  changed_when: false
+  tags: [crd, root-app]
+
+- name: Install AppProject CRD
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/crds/appproject-crd.yaml
+  register: appproject_crd
+  changed_when: "'configured' in appproject_crd.stdout or 'created' in appproject_crd.stdout"
+  tags: [crd, root-app]
+
+# ── Step 2: Generate bootstrap manifests ──────────────
+- name: Check for vendored bootstrap manifests
+  local_action: stat path="{{ role_path }}/files/argocd-install.yaml"
+  register: vendored_file
+  run_once: true
+  become: false
+
+- name: Generate bootstrap manifests with Helm
+  include_tasks: helm-template.yaml
+  when: not vendored_file.stat.exists
+
+# ── Step 3: Copy manifests to node ────────────────────
+- name: Copy bootstrap manifests to the node
+  copy:
+    src: argocd-install.yaml
+    dest: /tmp/argocd-install.yaml
+    mode: '0644'
+
+# ── Step 4: Create namespace ──────────────────────────
+- name: Create argocd namespace
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: kubectl create namespace argocd 2>/dev/null || true
+  changed_when: false
+
+# ── Step 5: Apply bootstrap manifests ─────────────────
+- name: Apply ArgoCD bootstrap manifests (server-side)
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl apply --server-side -f /tmp/argocd-install.yaml
+  register: apply_result
+  changed_when: "'configured' in apply_result.stdout or 'created' in apply_result.stdout"
+
+# ── Step 6: Wait for ArgoCD server ────────────────────
+- name: Wait for ArgoCD server to be ready
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl wait --for=condition=ready pod \
+      -n argocd -l app.kubernetes.io/name=argocd-server \
+      --timeout=300s
+  changed_when: false
+  ignore_errors: true
+
+# ── Step 7: Print admin password ──────────────────────
+- name: Retrieve initial admin password
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    kubectl get secret argocd-initial-admin-secret \
+      -n argocd -o jsonpath="{.data.password}" | base64 -d
+  register: argocd_password
+  ignore_errors: true
+
+- name: Print ArgoCD admin credentials
+  debug:
+    msg:
+      - "ArgoCD URL:   https://localhost:8080 (use port-forward)"
+      - "Admin user:   admin"
+      - "Admin password: {{ argocd_password.stdout | default('not available yet — check with kubectl get secret -n argocd argocd-initial-admin-secret') }}"
+      - ""
+      - "Port-forward command:"
+      - "  kubectl port-forward svc/argocd-server -n argocd 8080:443"
+  when: argocd_password.stdout is defined
+
+# ── Step 8 (optional): Apply root App of Apps ──────────
+# Only runs with: --tags root-app
+# Requires the homelab-gitops repo to exist on GitHub
+- name: Download root App of Apps manifest
+  local_action: get_url url="{{ argocd_gitops_repo }}/raw/main/apps/root.yaml" dest=/tmp/argocd-root.yaml timeout=30
+  register: root_download
+  run_once: true
+  become: false
+  tags: [root-app]
+
+- name: Copy root App of Apps manifest to node
+  copy:
+    src: /tmp/argocd-root.yaml
+    dest: /tmp/argocd-root.yaml
+    mode: '0644'
+  tags: [root-app]
+
+- name: Apply root App of Apps
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  command: kubectl apply -f /tmp/argocd-root.yaml
+  register: root_result
+  changed_when: "'created' in root_result.stdout"
+  tags: [root-app]
