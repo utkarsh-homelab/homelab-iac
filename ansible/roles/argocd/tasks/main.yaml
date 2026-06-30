@@ -115,7 +115,7 @@
 # Only runs with: --tags root-app
 # Requires the homelab-gitops repo to exist on GitHub
 - name: Download root App of Apps manifest
-  local_action: get_url url="{{ argocd_gitops_repo }}/raw/main/apps/root.yaml" dest=/tmp/argocd-root.yaml timeout=30
+  local_action: get_url url="{{ argocd_gitops_repo }}/raw/main/infra-apps/infra-root.yaml" dest=/tmp/argocd-root.yaml timeout=30
   register: root_download
   run_once: true
   become: false
